@@ -1,4 +1,4 @@
-"""ShadeInstall - kalkulátor plochy žaluzií a Excel zápis."""
+"""ShadeInstall - Interní Aplikace."""
 
 import sys
 from datetime import datetime
@@ -8,7 +8,6 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 from openpyxl import load_workbook
-from openpyxl.styles import Font
 from PIL import Image
 
 
@@ -28,62 +27,82 @@ def parse_dimension(value: str, name: str) -> Decimal:
     return dimension
 
 
-def write_calculation_to_workbook(
-    source_path: Path,
-    width_mm: Decimal,
-    height_mm: Decimal,
-) -> Path:
-    """Uloží nový záznam do nové kopie sešitu, původní listy nemění."""
-    workbook = load_workbook(
-        source_path,
-        data_only=False,
-        keep_vba=source_path.suffix.lower() == ".xlsm",
-    )
-    sheet_name = "Výpočty ShadeInstall"
-    headers = ("Datum", "Šířka (mm)", "Výška (mm)", "Plocha (m²)")
+TEMPLATE_FILE = "data/cenik_vzor.xlsx"
+PRICE_FILES = {"Zetta 90": "data/ceny_zetta90.xlsx"}
+TEMPLATE_CELLS = {
+    "width_mm": "E23",
+    "height_mm": "F23",
+    "price": "I23",
+}
+
+
+def lookup_price(blind_type: str, width_mm: Decimal, height_mm: Decimal) -> int:
+    price_file = PRICE_FILES.get(blind_type)
+    if price_file is None:
+        raise ValueError(f"Pro žaluzii {blind_type} není k dispozici ceník.")
+
+    price_path = resource_path(price_file)
+    if not price_path.exists():
+        raise FileNotFoundError(f"Chybí cenová tabulka {price_file}.")
+
+    workbook = load_workbook(price_path, read_only=True, data_only=True)
     try:
-        if sheet_name in workbook.sheetnames:
-            worksheet = workbook[sheet_name]
-            existing_headers = tuple(
-                worksheet.cell(row=1, column=col).value for col in range(1, 5)
-            )
-            if all(value is None for value in existing_headers):
-                worksheet.append(headers)
-            elif existing_headers != headers:
-                raise ValueError(f"List '{sheet_name}' má jinou strukturu.")
-        else:
-            worksheet = workbook.create_sheet(sheet_name)
-            worksheet.append(headers)
-
-        for cell in worksheet[1]:
-            cell.font = Font(bold=True)
-        worksheet.append(
-            [
-                datetime.now(),
-                float(width_mm),
-                float(height_mm),
-                float(width_mm * height_mm / Decimal("1000000")),
-            ]
+        worksheet = workbook.active
+        widths = [worksheet.cell(row=1, column=column).value
+                  for column in range(2, worksheet.max_column + 1)]
+        heights = [worksheet.cell(row=row, column=1).value
+                   for row in range(2, worksheet.max_row + 1)]
+        selected_width = next(
+            (value for value in widths if Decimal(str(value)) >= width_mm), None
         )
-        row = worksheet.max_row
-        worksheet.cell(row=row, column=1).number_format = "yyyy-mm-dd hh:mm:ss"
-        worksheet.cell(row=row, column=4).number_format = "0.0000"
-        worksheet.freeze_panes = "A2"
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
-        output_path = source_path.with_name(
-            f"{source_path.stem}_ShadeInstall_{timestamp}{source_path.suffix}"
+        selected_height = next(
+            (value for value in heights if Decimal(str(value)) >= height_mm), None
         )
-        workbook.save(output_path)
-        return output_path
+        if selected_width is None or selected_height is None:
+            raise ValueError("Zadané rozměry přesahují rozsah cenové tabulky.")
+
+        column = widths.index(selected_width) + 2
+        row = heights.index(selected_height) + 2
+        price = worksheet.cell(row=row, column=column).value
+        if not isinstance(price, (int, float)):
+            raise ValueError("Pro zadané rozměry není v cenové tabulce cena.")
+        return int(price)
     finally:
         workbook.close()
+
+
+def create_pricelist(
+    output_path: Path,
+    width_mm: Decimal,
+    height_mm: Decimal,
+    price: int,
+) -> None:
+    """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
+    template_path = resource_path(TEMPLATE_FILE)
+    if not template_path.exists():
+        raise FileNotFoundError(f"Chybí šablona {TEMPLATE_FILE}.")
+    workbook = load_workbook(template_path)
+    try:
+        worksheet = workbook.active
+        values = {
+            "width_mm": float(width_mm),
+            "height_mm": float(height_mm),
+            "price": price,
+        }
+        for key, cell in TEMPLATE_CELLS.items():
+            worksheet[cell] = values[key]
+        workbook.save(output_path)
+    finally:
+        workbook.close()
+
+
+BLIND_TYPES = ["Zetta 90"]
 
 
 class ShadeInstallApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
-        self.title("ShadeInstall.cz - Kalkulátor žaluzií")
+        self.title("ShadeInstall - Interní Aplikace")
         self.geometry("1050x700")
         self.minsize(850, 600)
         self.configure(fg_color="#f8f9fa")
@@ -161,11 +180,37 @@ class ShadeInstallApp(ctk.CTk):
             text_color="#1e293b",
         ).pack(anchor="w", padx=30, pady=(30, 15))
 
+        ctk.CTkLabel(
+            content,
+            text="Výběr žaluzie:",
+            font=("Segoe UI", 13),
+            text_color="#475569",
+        ).pack(anchor="w", padx=30, pady=(5, 2))
+        self.blind_type = ctk.CTkOptionMenu(
+            content,
+            values=BLIND_TYPES,
+            width=320,
+            height=38,
+            corner_radius=8,
+            fg_color="#f8f9fa",
+            button_color="#cbd5e1",
+            button_hover_color="#94a3b8",
+            text_color="#1e293b",
+        )
+        self.blind_type.pack(anchor="w", padx=30, pady=(0, 12))
+
         self.entry_width = self._add_dimension_field(content, "Šířka (mm):")
         self.entry_height = self._add_dimension_field(content, "Výška (mm):")
+        self.price_result = ctk.CTkLabel(
+            content,
+            text="",
+            font=("Segoe UI", 16, "bold"),
+            text_color="#16803c",
+        )
+        self.price_result.pack(anchor="w", padx=30, pady=(0, 8))
         ctk.CTkButton(
             content,
-            text="Spočítat a zapsat do ceníku",
+            text="Vytvořit ceník",
             fg_color="#0d6efd",
             hover_color="#0b5ed7",
             text_color="#ffffff",
@@ -201,31 +246,36 @@ class ShadeInstallApp(ctk.CTk):
             messagebox.showerror("Neplatné rozměry", str(error), parent=self)
             return
 
-        selected_file = filedialog.askopenfilename(
-            title="Vyberte Excel ceník",
-            filetypes=(("Excel sešit", "*.xlsx *.xlsm"),),
+        try:
+            price = lookup_price(self.blind_type.get(), width_mm, height_mm)
+        except (FileNotFoundError, ValueError) as error:
+            self.price_result.configure(text="")
+            messagebox.showerror("Cenu se nepodařilo vypočítat", str(error), parent=self)
+            return
+        self.price_result.configure(text=f"Výsledná cena: {price:,} Kč".replace(",", " "))
+
+        selected_file = filedialog.asksaveasfilename(
+            title="Uložit nový ceník",
+            defaultextension=".xlsx",
+            initialfile=f"Cenik_{datetime.now():%Y%m%d_%H%M%S}.xlsx",
+            filetypes=(("Excel sešit", "*.xlsx"),),
             parent=self,
         )
         if not selected_file:
             return
-        source_path = Path(selected_file)
+        output_path = Path(selected_file)
         try:
-            output_path = write_calculation_to_workbook(
-                source_path, width_mm, height_mm
+            create_pricelist(
+                output_path, width_mm, height_mm, price
             )
         except Exception as error:
             messagebox.showerror(
-                "Zápis do Excelu se nezdařil",
-                f"Původní sešit nebyl změněn.\n\n{error}",
-                parent=self,
+                "Vytvoření ceníku se nezdařilo", str(error), parent=self
             )
             return
 
-        area_m2 = width_mm * height_mm / Decimal("1000000")
         messagebox.showinfo(
-            "Záznam uložen",
-            f"Plocha: {area_m2:.4f} m²\n\nKopie ceníku:\n{output_path}",
-            parent=self,
+            "Ceník vytvořen", f"Nový ceník:\n{output_path}", parent=self
         )
 
 
