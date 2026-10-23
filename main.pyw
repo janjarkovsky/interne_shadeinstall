@@ -199,8 +199,8 @@ class ShadeInstallApp(ctk.CTk):
         )
         self.blind_type.pack(anchor="w", padx=30, pady=(0, 12))
 
-        self.entry_width = self._add_dimension_field(content, "Šířka (mm):")
         self.entry_height = self._add_dimension_field(content, "Výška (mm):")
+        self.entry_width = self._add_dimension_field(content, "Šířka (mm):")
         self.price_result = ctk.CTkLabel(
             content,
             text="",
