@@ -483,6 +483,27 @@ class ShadeInstallApp(ctk.CTk):
             command=lambda: self.add_blind_item(focus_new=True),
         )
         self.add_blind_button.pack(anchor="w", padx=30, pady=(0, 12))
+        discount_frame = ctk.CTkFrame(content, fg_color="transparent")
+        discount_frame.pack(anchor="w", padx=30, pady=(0, 8))
+        discount_frame.grid_columnconfigure(0, weight=1, uniform="discount-fields")
+        discount_frame.grid_columnconfigure(1, weight=1, uniform="discount-fields")
+        blind_discount_field = ctk.CTkFrame(
+            discount_frame, fg_color="transparent"
+        )
+        blind_discount_field.grid(row=0, column=0, padx=(0, 3), sticky="ew")
+        accessory_discount_field = ctk.CTkFrame(
+            discount_frame, fg_color="transparent"
+        )
+        accessory_discount_field.grid(row=0, column=1, padx=(3, 0), sticky="ew")
+        self.entry_blind_discount = self._add_text_field(
+            blind_discount_field, "Sleva na žaluzie (%):", width=130, padx=4
+        )
+        self.entry_accessory_discount = self._add_text_field(
+            accessory_discount_field,
+            "Sleva na příslušenství (%):",
+            width=130,
+            padx=4,
+        )
         transport_field = ctk.CTkFrame(content, fg_color="transparent")
         transport_field.pack(anchor="w", padx=30, pady=(0, 4))
         self.entry_transport_distance = self._add_text_field(
@@ -504,27 +525,14 @@ class ShadeInstallApp(ctk.CTk):
         self.route_planner_link.bind(
             "<Button-1>", lambda _event: open_route_planner()
         )
-        discount_frame = ctk.CTkFrame(content, fg_color="transparent")
-        discount_frame.pack(anchor="w", padx=30, pady=(0, 8))
-        discount_frame.grid_columnconfigure(0, weight=1, uniform="discount-fields")
-        discount_frame.grid_columnconfigure(1, weight=1, uniform="discount-fields")
-        blind_discount_field = ctk.CTkFrame(
-            discount_frame, fg_color="transparent"
+        self.add_blind_item(focus_new=False)
+        self.price_result = ctk.CTkLabel(
+            content,
+            text="",
+            font=("Segoe UI", 16, "bold"),
+            text_color="#16803c",
         )
-        blind_discount_field.grid(row=0, column=0, padx=(0, 3), sticky="ew")
-        accessory_discount_field = ctk.CTkFrame(
-            discount_frame, fg_color="transparent"
-        )
-        accessory_discount_field.grid(row=0, column=1, padx=(3, 0), sticky="ew")
-        self.entry_blind_discount = self._add_text_field(
-            blind_discount_field, "Sleva na žaluzie (%):", width=130, padx=4
-        )
-        self.entry_accessory_discount = self._add_text_field(
-            accessory_discount_field,
-            "Sleva příslušenství (%):",
-            width=130,
-            padx=4,
-        )
+        self.price_result.pack(anchor="w", padx=30, pady=(0, 8))
         self.margin_enabled = BooleanVar(master=self, value=True)
         self.margin_checkbox = ctk.CTkCheckBox(
             content,
@@ -540,14 +548,6 @@ class ShadeInstallApp(ctk.CTk):
             font=("Segoe UI", 13),
         )
         self.margin_checkbox.pack(anchor="w", padx=30, pady=(0, 12))
-        self.add_blind_item(focus_new=False)
-        self.price_result = ctk.CTkLabel(
-            content,
-            text="",
-            font=("Segoe UI", 16, "bold"),
-            text_color="#16803c",
-        )
-        self.price_result.pack(anchor="w", padx=30, pady=(0, 8))
         self.create_button = ctk.CTkButton(
             content,
             text="Vytvořit cenovou nabídku",
