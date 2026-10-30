@@ -304,7 +304,7 @@ def create_pricelist(
                 for row in range(1, worksheet.max_row + 1)
                 if isinstance(worksheet.cell(row=row, column=2).value, str)
                 and worksheet.cell(row=row, column=2).value.strip().casefold()
-                == "doprava"
+                .startswith("doprava")
             ),
             None,
         )
