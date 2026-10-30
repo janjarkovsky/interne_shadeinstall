@@ -40,6 +40,19 @@ def parse_count(value: str) -> int:
     return count
 
 
+def parse_discount(value: str) -> Decimal:
+    value = value.strip()
+    if not value:
+        return Decimal("0")
+    try:
+        percent = Decimal(value.replace(",", "."))
+    except InvalidOperation as error:
+        raise ValueError("Sleva musí být číslo od 0 do 100 %.") from error
+    if not percent.is_finite() or not 0 <= percent <= 100:
+        raise ValueError("Sleva musí být číslo od 0 do 100 %.")
+    return percent / 100
+
+
 def calculate_holder_count(width_cm: Decimal) -> int:
     if width_cm <= 160:
         return 2
@@ -241,6 +254,8 @@ def create_pricelist(
     customer_name: str,
     installation_location: str,
     blind_type: str,
+    blind_discount: Decimal,
+    accessory_discount: Decimal,
 ) -> None:
     """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
     if not 1 <= len(items) <= MAX_BLIND_ITEMS:
@@ -257,6 +272,8 @@ def create_pricelist(
         worksheet["K9"] = quote_number
         worksheet["E9"] = customer_name
         worksheet["E10"] = installation_location
+        worksheet["J22"] = float(blind_discount)
+        worksheet["J42"] = float(accessory_discount)
         for item_index, item in enumerate(items):
             row = ITEM_START_ROW + item_index
             worksheet[f"B{row}"] = item["holder_count"]
@@ -429,6 +446,27 @@ class ShadeInstallApp(ctk.CTk):
             command=lambda: self.add_blind_item(focus_new=True),
         )
         self.add_blind_button.pack(anchor="w", padx=30, pady=(0, 12))
+        discount_frame = ctk.CTkFrame(content, fg_color="transparent")
+        discount_frame.pack(anchor="w", padx=30, pady=(0, 8))
+        discount_frame.grid_columnconfigure(0, weight=1, uniform="discount-fields")
+        discount_frame.grid_columnconfigure(1, weight=1, uniform="discount-fields")
+        blind_discount_field = ctk.CTkFrame(
+            discount_frame, fg_color="transparent"
+        )
+        blind_discount_field.grid(row=0, column=0, padx=(0, 3), sticky="ew")
+        accessory_discount_field = ctk.CTkFrame(
+            discount_frame, fg_color="transparent"
+        )
+        accessory_discount_field.grid(row=0, column=1, padx=(3, 0), sticky="ew")
+        self.entry_blind_discount = self._add_text_field(
+            blind_discount_field, "Sleva na žaluzie (%):", width=130, padx=4
+        )
+        self.entry_accessory_discount = self._add_text_field(
+            accessory_discount_field,
+            "Sleva příslušenství (%):",
+            width=130,
+            padx=4,
+        )
         self.margin_enabled = BooleanVar(master=self, value=True)
         self.margin_checkbox = ctk.CTkCheckBox(
             content,
@@ -704,6 +742,14 @@ class ShadeInstallApp(ctk.CTk):
         quote_number_for_filename = quote_number
         quote_number = f"{quote_number}-{datetime.now():%y}"
         installation_location = self.entry_installation_location.get().strip()
+        try:
+            blind_discount = parse_discount(self.entry_blind_discount.get())
+            accessory_discount = parse_discount(
+                self.entry_accessory_discount.get()
+            )
+        except ValueError as error:
+            messagebox.showerror("Neplatná sleva", str(error), parent=self)
+            return
 
         items = []
         for item_number, fields in enumerate(self.blind_items, start=1):
@@ -790,6 +836,8 @@ class ShadeInstallApp(ctk.CTk):
                 customer_label,
                 installation_location,
                 self.blind_type.get(),
+                blind_discount,
+                accessory_discount,
             )
         except Exception as error:
             messagebox.showerror(
@@ -804,6 +852,8 @@ class ShadeInstallApp(ctk.CTk):
             self.entry_customer_name,
             self.entry_quote_number,
             self.entry_installation_location,
+            self.entry_blind_discount,
+            self.entry_accessory_discount,
         ):
             entry.delete(0, "end")
         for item in self.blind_items[1:]:
