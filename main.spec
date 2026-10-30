@@ -6,7 +6,7 @@ datas = [
     ('logo_mark.png', '.'),
     ('data/ceny_zetta90.xlsx', 'data'),
     ('data/vzor_cenik_zetta90.xlsx', 'data'),
-    ('data/vzor_cennik_zetta90_bal.xlsx', 'data'),
+    ('data/vzor_cenik_Zetta90_ral.xlsx', 'data'),
 ]
 binaries = []
 hiddenimports = []

@@ -168,7 +168,7 @@ def _delete_unused_item_rows(worksheet, item_count: int) -> None:
 
 TEMPLATE_FILES = {
     "Zetta 90 - Standart": "data/vzor_cenik_zetta90.xlsx",
-    "Zetta 90 - RAL": "data/vzor_cennik_zetta90_bal.xlsx",
+    "Zetta 90 - RAL": "data/vzor_cenik_Zetta90_ral.xlsx",
 }
 PRICE_FILES = {
     "Zetta 90 - Standart": "data/ceny_zetta90.xlsx",

@@ -1,7 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('logo.ico', '.'), ('logo_mark.png', '.'), ('data/ceny_zetta90.xlsx', 'data'), ('data/vzor_cenik_zetta90.xlsx', 'data'), ('data/vzor_cennik_zetta90_bal.xlsx', 'data')]
+datas = [('logo.ico', '.'), ('logo_mark.png', '.'), ('data/ceny_zetta90.xlsx', 'data'), ('data/vzor_cenik_zetta90.xlsx', 'data'), ('data/vzor_cenik_Zetta90_ral.xlsx', 'data')]
 binaries = []
 hiddenimports = []
 tmp_ret = collect_all('customtkinter')

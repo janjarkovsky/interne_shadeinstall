@@ -11,7 +11,7 @@ V prostředí s nainstalovaným Pythonem spusťte v této složce:
 
 ```powershell
 py -m pip install customtkinter openpyxl pyinstaller
-py -m PyInstaller --noconsole --onefile --name ShadeInstall --collect-all customtkinter --icon=logo.ico --add-data=logo.ico:. --add-data=logo_mark.png:. --add-data=data/ceny_zetta90.xlsx:data --add-data=data/vzor_cenik_zetta90.xlsx:data --add-data=data/vzor_cennik_zetta90_bal.xlsx:data main.pyw
+py -m PyInstaller --noconsole --onefile --name ShadeInstall --collect-all customtkinter --icon=logo.ico --add-data=logo.ico:. --add-data=logo_mark.png:. --add-data=data/ceny_zetta90.xlsx:data --add-data=data/vzor_cenik_zetta90.xlsx:data --add-data=data/vzor_cenik_Zetta90_ral.xlsx:data main.pyw
 ```
 
 Výsledný soubor `ShadeInstall.exe` bude ve složce `dist`. Cílový uživatel k jeho spuštění
