@@ -206,6 +206,8 @@ def create_pricelist(
     output_path: Path,
     items: list[dict],
     quote_number: str,
+    customer_name: str,
+    installation_location: str,
 ) -> None:
     """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
     if not 1 <= len(items) <= MAX_BLIND_ITEMS:
@@ -217,6 +219,8 @@ def create_pricelist(
     try:
         worksheet = workbook.active
         worksheet["K9"] = quote_number
+        worksheet["E9"] = customer_name
+        worksheet["E10"] = installation_location
         for item_index, item in enumerate(items):
             row = ITEM_START_ROW + item_index
             worksheet[f"B{row}"] = item["holder_count"]
@@ -315,8 +319,31 @@ class ShadeInstallApp(ctk.CTk):
         )
         content.grid(row=1, column=0, padx=25, pady=25, sticky="nsew")
 
+        customer_quote_frame = ctk.CTkFrame(content, fg_color="transparent")
+        customer_quote_frame.pack(fill="x", padx=30, pady=(5, 2))
+        customer_fields = []
+        for column in range(3):
+            customer_quote_frame.grid_columnconfigure(
+                column, weight=1, uniform="customer-fields"
+            )
+            field_frame = ctk.CTkFrame(
+                customer_quote_frame, fg_color="transparent"
+            )
+            field_frame.grid(
+                row=0,
+                column=column,
+                padx=(0 if column == 0 else 6, 0 if column == 2 else 6),
+                sticky="ew",
+            )
+            customer_fields.append(field_frame)
         self.entry_customer_name = self._add_text_field(
-            content, "Jméno zákazníka:"
+            customer_fields[0], "Jméno zákazníka:", width=130, padx=4
+        )
+        self.entry_installation_location = self._add_text_field(
+            customer_fields[1], "Místo realizace:", width=130, padx=4
+        )
+        self.entry_quote_number = self._add_text_field(
+            customer_fields[2], "Číslo cenové nabídky:", width=130, padx=4
         )
         ctk.CTkLabel(
             content,
@@ -337,9 +364,6 @@ class ShadeInstallApp(ctk.CTk):
         )
         self.blind_type.pack(anchor="w", padx=30, pady=(0, 12))
 
-        self.entry_quote_number = self._add_text_field(
-            content, "Číslo cenové nabídky:"
-        )
         self.blind_items_frame = ctk.CTkFrame(content, fg_color="transparent")
         self.blind_items_frame.pack(fill="x", padx=30, pady=(8, 8))
         for column, label in enumerate(
@@ -391,9 +415,10 @@ class ShadeInstallApp(ctk.CTk):
         )
         self.create_button.pack(anchor="w", padx=30, pady=10)
 
-        self._bind_enter(self.entry_customer_name, self.blind_type)
-        self._bind_enter(self.blind_type, self.entry_quote_number)
-        self._bind_enter(self.entry_quote_number, self.blind_items[0]["width"])
+        self._bind_enter(self.entry_customer_name, self.entry_installation_location)
+        self._bind_enter(self.entry_installation_location, self.entry_quote_number)
+        self._bind_enter(self.entry_quote_number, self.blind_type)
+        self._bind_enter(self.blind_type, self.blind_items[0]["width"])
         self.add_blind_button.bind(
             "<Return>", self._handle_add_blind_enter, add="+"
         )
@@ -402,20 +427,25 @@ class ShadeInstallApp(ctk.CTk):
         )
 
     @staticmethod
-    def _add_text_field(parent: ctk.CTkFrame, label: str) -> ctk.CTkEntry:
+    def _add_text_field(
+        parent: ctk.CTkFrame,
+        label: str,
+        width: int = 320,
+        padx: int = 30,
+    ) -> ctk.CTkEntry:
         ctk.CTkLabel(
             parent, text=label, font=("Segoe UI", 13), text_color="#475569"
-        ).pack(anchor="w", padx=30, pady=(5, 2))
+        ).pack(anchor="w", padx=padx, pady=(5, 2))
         entry = ctk.CTkEntry(
             parent,
-            width=320,
+            width=width,
             height=38,
             corner_radius=8,
             fg_color="#f8f9fa",
             border_color="#cbd5e1",
             text_color="#1e293b",
         )
-        entry.pack(anchor="w", padx=30, pady=(0, 12))
+        entry.pack(fill="x", expand=True, padx=padx, pady=(0, 12))
         return entry
 
     @staticmethod
@@ -581,6 +611,7 @@ class ShadeInstallApp(ctk.CTk):
             )
             return
         quote_number = f"{quote_number}-{datetime.now():%y}"
+        installation_location = self.entry_installation_location.get().strip()
 
         items = []
         for item_number, fields in enumerate(self.blind_items, start=1):
@@ -657,6 +688,8 @@ class ShadeInstallApp(ctk.CTk):
                 output_path,
                 items,
                 quote_number,
+                customer_name,
+                installation_location,
             )
         except Exception as error:
             messagebox.showerror(
@@ -667,7 +700,11 @@ class ShadeInstallApp(ctk.CTk):
         messagebox.showinfo(
             "Ceník vytvořen", f"Nový ceník:\n{output_path}", parent=self
         )
-        for entry in (self.entry_customer_name, self.entry_quote_number):
+        for entry in (
+            self.entry_customer_name,
+            self.entry_quote_number,
+            self.entry_installation_location,
+        ):
             entry.delete(0, "end")
         for item in self.blind_items[1:]:
             item["frame"].destroy()
