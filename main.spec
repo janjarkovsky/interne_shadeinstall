@@ -5,8 +5,10 @@ datas = [
     ('logo.ico', '.'),
     ('logo_mark.png', '.'),
     ('data/ceny_zetta90.xlsx', 'data'),
-    ('data/vzor_cenik_zetta90.xlsx', 'data'),
-    ('data/vzor_cenik_Zetta90_ral.xlsx', 'data'),
+    ('data/vzor_cenik_zetta90_standard_motor.xlsx', 'data'),
+    ('data/vzor_cenik_Zetta90_standard_manual.xlsx', 'data'),
+    ('data/vzor_cenik_Zetta90_ral_motor.xlsx', 'data'),
+    ('data/vzor_cenik_Zetta90_ral_manual.xlsx', 'data'),
 ]
 binaries = []
 hiddenimports = []

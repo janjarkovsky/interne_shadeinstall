@@ -133,13 +133,15 @@ def _shift_formula_rows(
     return reference_pattern.sub(replace_reference, formula)
 
 
-def _delete_unused_item_rows(worksheet, item_count: int) -> None:
+def _delete_unused_item_rows(
+    worksheet, item_count: int, item_start_row: int
+) -> None:
     deleted_count = MAX_BLIND_ITEMS - item_count
     if deleted_count <= 0:
         return
 
-    delete_start = ITEM_START_ROW + item_count
-    delete_end = ITEM_START_ROW + MAX_BLIND_ITEMS - 1
+    delete_start = item_start_row + item_count
+    delete_end = item_start_row + MAX_BLIND_ITEMS - 1
     for row in worksheet.iter_rows():
         for cell in row:
             if cell.data_type == "f" and isinstance(cell.value, str):
@@ -212,15 +214,33 @@ def _delete_unused_item_rows(worksheet, item_count: int) -> None:
         )
 
 
-TEMPLATE_FILES = {
-    "Zetta 90 - Standart": "data/vzor_cenik_zetta90.xlsx",
-    "Zetta 90 - RAL": "data/vzor_cenik_Zetta90_ral.xlsx",
+TEMPLATE_CONFIGS = {
+    ("Standard", "Motorický"): {
+        "file": "data/vzor_cenik_zetta90_standard_motor.xlsx",
+        "item_start_row": 23,
+        "blind_discount_cell": "J22",
+        "accessory_discount_cell": "J42",
+    },
+    ("Standard", "Manuální"): {
+        "file": "data/vzor_cenik_Zetta90_standard_manual.xlsx",
+        "item_start_row": 20,
+        "blind_discount_cell": "J19",
+        "accessory_discount_cell": "J39",
+    },
+    ("RAL", "Motorický"): {
+        "file": "data/vzor_cenik_Zetta90_ral_motor.xlsx",
+        "item_start_row": 23,
+        "blind_discount_cell": "J22",
+        "accessory_discount_cell": "J42",
+    },
+    ("RAL", "Manuální"): {
+        "file": "data/vzor_cenik_Zetta90_ral_manual.xlsx",
+        "item_start_row": 20,
+        "blind_discount_cell": "J19",
+        "accessory_discount_cell": "J39",
+    },
 }
-PRICE_FILES = {
-    "Zetta 90 - Standart": "data/ceny_zetta90.xlsx",
-    "Zetta 90 - RAL": "data/ceny_zetta90.xlsx",
-}
-ITEM_START_ROW = 23
+PRICE_FILES = {"Zetta 90": "data/ceny_zetta90.xlsx"}
 MAX_BLIND_ITEMS = 14
 MIN_ALLOWED_WIDTH_CM = Decimal("60")
 MAX_ALLOWED_HEIGHT_CM = Decimal("400")
@@ -277,6 +297,8 @@ def create_pricelist(
     customer_name: str,
     installation_location: str,
     blind_type: str,
+    color_type: str,
+    drive_type: str,
     blind_discount: Decimal,
     accessory_discount: Decimal,
     transport_cost: Decimal,
@@ -284,20 +306,24 @@ def create_pricelist(
     """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
     if not 1 <= len(items) <= MAX_BLIND_ITEMS:
         raise ValueError(f"Ceník musí obsahovat 1 až {MAX_BLIND_ITEMS} žaluzií.")
-    template_file = TEMPLATE_FILES.get(blind_type)
-    if template_file is None:
-        raise ValueError(f"Pro žaluzii {blind_type} není k dispozici vzor.")
-    template_path = resource_path(template_file)
+    template_config = TEMPLATE_CONFIGS.get((color_type, drive_type))
+    if template_config is None:
+        raise ValueError(
+            f"Pro kombinaci {color_type} / {drive_type} není k dispozici vzor."
+        )
+    template_path = resource_path(template_config["file"])
     if not template_path.exists():
-        raise FileNotFoundError(f"Chybí šablona {template_file}.")
+        raise FileNotFoundError(f"Chybí šablona {template_config['file']}.")
     workbook = load_workbook(template_path)
     try:
         worksheet = workbook.active
         worksheet["K9"] = quote_number
         worksheet["E9"] = customer_name
         worksheet["E10"] = installation_location
-        worksheet["J22"] = float(blind_discount)
-        worksheet["J42"] = float(accessory_discount)
+        worksheet[template_config["blind_discount_cell"]] = float(blind_discount)
+        worksheet[template_config["accessory_discount_cell"]] = float(
+            accessory_discount
+        )
         transport_row = next(
             (
                 row
@@ -312,13 +338,15 @@ def create_pricelist(
             raise ValueError("Vzor ceníku neobsahuje řádek Doprava.")
         worksheet.cell(row=transport_row, column=9, value=float(transport_cost))
         for item_index, item in enumerate(items):
-            row = ITEM_START_ROW + item_index
+            row = template_config["item_start_row"] + item_index
             worksheet[f"B{row}"] = item["holder_count"]
             worksheet[f"E{row}"] = float(item["width_cm"])
             worksheet[f"F{row}"] = float(item["height_cm"])
             worksheet[f"G{row}"] = item["count"]
             worksheet[f"I{row}"] = item["price"]
-        _delete_unused_item_rows(worksheet, len(items))
+        _delete_unused_item_rows(
+            worksheet, len(items), template_config["item_start_row"]
+        )
         workbook.calculation.fullCalcOnLoad = True
         workbook.calculation.forceFullCalc = True
         workbook.calculation.calcMode = "auto"
@@ -327,7 +355,9 @@ def create_pricelist(
         workbook.close()
 
 
-BLIND_TYPES = ["Zetta 90 - Standart", "Zetta 90 - RAL"]
+BLIND_TYPES = ["Zetta 90"]
+COLOR_TYPES = ["Standard", "RAL"]
+DRIVE_TYPES = ["Motorický", "Manuální"]
 
 
 class ShadeInstallApp(ctk.CTk):
@@ -435,16 +465,34 @@ class ShadeInstallApp(ctk.CTk):
         self.entry_quote_number = self._add_text_field(
             customer_fields[2], "Číslo cenové nabídky:", width=130, padx=4
         )
+        blind_options_frame = ctk.CTkFrame(content, fg_color="transparent")
+        blind_options_frame.pack(fill="x", padx=30, pady=(5, 2))
+        for column in range(3):
+            blind_options_frame.grid_columnconfigure(
+                column, weight=1, uniform="blind-options"
+            )
         ctk.CTkLabel(
-            content,
+            blind_options_frame,
             text="Výběr žaluzie:",
             font=("Segoe UI", 13),
             text_color="#475569",
-        ).pack(anchor="w", padx=30, pady=(5, 2))
+        ).grid(row=0, column=0, padx=4, pady=(0, 2), sticky="w")
+        ctk.CTkLabel(
+            blind_options_frame,
+            text="Typ barvy:",
+            font=("Segoe UI", 13),
+            text_color="#475569",
+        ).grid(row=0, column=1, padx=4, pady=(0, 2), sticky="w")
+        ctk.CTkLabel(
+            blind_options_frame,
+            text="Typ pohonu:",
+            font=("Segoe UI", 13),
+            text_color="#475569",
+        ).grid(row=0, column=2, padx=4, pady=(0, 2), sticky="w")
         self.blind_type = ctk.CTkOptionMenu(
-            content,
+            blind_options_frame,
             values=BLIND_TYPES,
-            width=320,
+            width=140,
             height=38,
             corner_radius=8,
             fg_color="#f8f9fa",
@@ -452,7 +500,31 @@ class ShadeInstallApp(ctk.CTk):
             button_hover_color="#94a3b8",
             text_color="#1e293b",
         )
-        self.blind_type.pack(anchor="w", padx=30, pady=(0, 12))
+        self.blind_type.grid(row=1, column=0, padx=4, pady=(0, 8), sticky="ew")
+        self.color_type = ctk.CTkOptionMenu(
+            blind_options_frame,
+            values=COLOR_TYPES,
+            width=140,
+            height=38,
+            corner_radius=8,
+            fg_color="#f8f9fa",
+            button_color="#cbd5e1",
+            button_hover_color="#94a3b8",
+            text_color="#1e293b",
+        )
+        self.color_type.grid(row=1, column=1, padx=4, pady=(0, 8), sticky="ew")
+        self.drive_type = ctk.CTkOptionMenu(
+            blind_options_frame,
+            values=DRIVE_TYPES,
+            width=140,
+            height=38,
+            corner_radius=8,
+            fg_color="#f8f9fa",
+            button_color="#cbd5e1",
+            button_hover_color="#94a3b8",
+            text_color="#1e293b",
+        )
+        self.drive_type.grid(row=1, column=2, padx=4, pady=(0, 8), sticky="ew")
 
         self.blind_items_frame = ctk.CTkFrame(content, fg_color="transparent")
         self.blind_items_frame.pack(fill="x", padx=30, pady=(8, 8))
@@ -565,7 +637,9 @@ class ShadeInstallApp(ctk.CTk):
         self._bind_enter(self.entry_customer_name, self.entry_installation_location)
         self._bind_enter(self.entry_installation_location, self.entry_quote_number)
         self._bind_enter(self.entry_quote_number, self.blind_type)
-        self._bind_enter(self.blind_type, self.blind_items[0]["width"])
+        self._bind_enter(self.blind_type, self.color_type)
+        self._bind_enter(self.color_type, self.drive_type)
+        self._bind_enter(self.drive_type, self.blind_items[0]["width"])
         self.add_blind_button.bind(
             "<Return>", self._handle_add_blind_enter, add="+"
         )
@@ -904,6 +978,8 @@ class ShadeInstallApp(ctk.CTk):
                 customer_label,
                 installation_location,
                 self.blind_type.get(),
+                self.color_type.get(),
+                self.drive_type.get(),
                 blind_discount,
                 accessory_discount,
                 transport_cost,
