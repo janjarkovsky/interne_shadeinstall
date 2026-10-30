@@ -7,6 +7,7 @@ from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from tkinter import BooleanVar, filedialog, messagebox
+import webbrowser
 
 import customtkinter as ctk
 from openpyxl import load_workbook
@@ -51,6 +52,19 @@ def parse_discount(value: str) -> Decimal:
     if not percent.is_finite() or not 0 <= percent <= 100:
         raise ValueError("Sleva musí být číslo od 0 do 100 %.")
     return percent / 100
+
+
+def parse_transport_distance(value: str) -> Decimal:
+    value = value.strip()
+    if not value:
+        return Decimal("0")
+    try:
+        distance = Decimal(value.replace(",", "."))
+    except InvalidOperation as error:
+        raise ValueError("Vzdálenost musí být nezáporné číslo v kilometrech.") from error
+    if not distance.is_finite() or distance < 0:
+        raise ValueError("Vzdálenost musí být nezáporné číslo v kilometrech.")
+    return distance
 
 
 def calculate_holder_count(width_cm: Decimal) -> int:
@@ -210,6 +224,15 @@ ITEM_START_ROW = 23
 MAX_BLIND_ITEMS = 14
 MIN_ALLOWED_WIDTH_CM = Decimal("60")
 MAX_ALLOWED_HEIGHT_CM = Decimal("400")
+ROUTE_PLANNER_URL = (
+    "https://mapy.com/cs/turisticka?planovani-trasy&rc=9hFPgxYGxI&rs=addr"
+    "&rs=&ri=8991762&ri=&mrp=%7B%22c%22%3A111%2C%22dt%22%3A%22%22%2C%22d%22"
+    "%3Atrue%7D&xc=%5B%5D&rut=1&rbf=alf&x=15.6252330&y=49.8022514&z=8"
+)
+
+
+def open_route_planner() -> None:
+    webbrowser.open(ROUTE_PLANNER_URL, new=2)
 
 
 def lookup_price(blind_type: str, width_mm: Decimal, height_mm: Decimal) -> int:
@@ -256,6 +279,7 @@ def create_pricelist(
     blind_type: str,
     blind_discount: Decimal,
     accessory_discount: Decimal,
+    transport_cost: Decimal,
 ) -> None:
     """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
     if not 1 <= len(items) <= MAX_BLIND_ITEMS:
@@ -274,6 +298,19 @@ def create_pricelist(
         worksheet["E10"] = installation_location
         worksheet["J22"] = float(blind_discount)
         worksheet["J42"] = float(accessory_discount)
+        transport_row = next(
+            (
+                row
+                for row in range(1, worksheet.max_row + 1)
+                if isinstance(worksheet.cell(row=row, column=2).value, str)
+                and worksheet.cell(row=row, column=2).value.strip().casefold()
+                == "doprava"
+            ),
+            None,
+        )
+        if transport_row is None:
+            raise ValueError("Vzor ceníku neobsahuje řádek Doprava.")
+        worksheet.cell(row=transport_row, column=9, value=float(transport_cost))
         for item_index, item in enumerate(items):
             row = ITEM_START_ROW + item_index
             worksheet[f"B{row}"] = item["holder_count"]
@@ -446,6 +483,27 @@ class ShadeInstallApp(ctk.CTk):
             command=lambda: self.add_blind_item(focus_new=True),
         )
         self.add_blind_button.pack(anchor="w", padx=30, pady=(0, 12))
+        transport_field = ctk.CTkFrame(content, fg_color="transparent")
+        transport_field.pack(anchor="w", padx=30, pady=(0, 4))
+        self.entry_transport_distance = self._add_text_field(
+            transport_field,
+            "Cena dopravy (km jedné trasy):",
+            width=170,
+            padx=4,
+            entry_bottom_padding=2,
+        )
+        self.route_planner_link = ctk.CTkLabel(
+            transport_field,
+            text="Spočítat trasu na Mapy.cz",
+            font=("Segoe UI", 11, "underline"),
+            text_color="#0d6efd",
+            fg_color="transparent",
+            cursor="hand2",
+        )
+        self.route_planner_link.pack(anchor="w", padx=4, pady=0)
+        self.route_planner_link.bind(
+            "<Button-1>", lambda _event: open_route_planner()
+        )
         discount_frame = ctk.CTkFrame(content, fg_color="transparent")
         discount_frame.pack(anchor="w", padx=30, pady=(0, 8))
         discount_frame.grid_columnconfigure(0, weight=1, uniform="discount-fields")
@@ -521,6 +579,7 @@ class ShadeInstallApp(ctk.CTk):
         label: str,
         width: int = 320,
         padx: int = 30,
+        entry_bottom_padding: int = 12,
     ) -> ctk.CTkEntry:
         ctk.CTkLabel(
             parent, text=label, font=("Segoe UI", 13), text_color="#475569"
@@ -534,7 +593,12 @@ class ShadeInstallApp(ctk.CTk):
             border_color="#cbd5e1",
             text_color="#1e293b",
         )
-        entry.pack(fill="x", expand=True, padx=padx, pady=(0, 12))
+        entry.pack(
+            fill="x",
+            expand=True,
+            padx=padx,
+            pady=(0, entry_bottom_padding),
+        )
         return entry
 
     @staticmethod
@@ -747,9 +811,13 @@ class ShadeInstallApp(ctk.CTk):
             accessory_discount = parse_discount(
                 self.entry_accessory_discount.get()
             )
+            transport_distance = parse_transport_distance(
+                self.entry_transport_distance.get()
+            )
         except ValueError as error:
-            messagebox.showerror("Neplatná sleva", str(error), parent=self)
+            messagebox.showerror("Neplatné údaje", str(error), parent=self)
             return
+        transport_cost = transport_distance * 4 * 13
 
         items = []
         for item_number, fields in enumerate(self.blind_items, start=1):
@@ -838,6 +906,7 @@ class ShadeInstallApp(ctk.CTk):
                 self.blind_type.get(),
                 blind_discount,
                 accessory_discount,
+                transport_cost,
             )
         except Exception as error:
             messagebox.showerror(
@@ -854,6 +923,7 @@ class ShadeInstallApp(ctk.CTk):
             self.entry_installation_location,
             self.entry_blind_discount,
             self.entry_accessory_discount,
+            self.entry_transport_distance,
         ):
             entry.delete(0, "end")
         for item in self.blind_items[1:]:
