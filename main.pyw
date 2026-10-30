@@ -891,7 +891,7 @@ class ShadeInstallApp(ctk.CTk):
         except ValueError as error:
             messagebox.showerror("Neplatné údaje", str(error), parent=self)
             return
-        transport_cost = transport_distance * 4 * 13
+        transport_cost = max(Decimal("600"), transport_distance * 4 * 13)
 
         items = []
         for item_number, fields in enumerate(self.blind_items, start=1):
