@@ -27,11 +27,22 @@ def parse_dimension(value: str, name: str) -> Decimal:
     return dimension
 
 
+def parse_count(value: str) -> int:
+    try:
+        count = int(value.strip())
+    except ValueError as error:
+        raise ValueError("Počet musí být kladné celé číslo.") from error
+    if count <= 0:
+        raise ValueError("Počet musí být kladné celé číslo.")
+    return count
+
+
 TEMPLATE_FILE = "data/cenik_vzor.xlsx"
 PRICE_FILES = {"Zetta 90": "data/ceny_zetta90.xlsx"}
 TEMPLATE_CELLS = {
     "width_mm": "E23",
     "height_mm": "F23",
+    "count": "G23",
     "price": "I23",
 }
 
@@ -75,6 +86,7 @@ def create_pricelist(
     output_path: Path,
     width_mm: Decimal,
     height_mm: Decimal,
+    count: int,
     price: int,
 ) -> None:
     """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
@@ -87,6 +99,7 @@ def create_pricelist(
         values = {
             "width_mm": float(width_mm),
             "height_mm": float(height_mm),
+            "count": count,
             "price": price,
         }
         for key, cell in TEMPLATE_CELLS.items():
@@ -201,6 +214,7 @@ class ShadeInstallApp(ctk.CTk):
 
         self.entry_height = self._add_dimension_field(content, "Výška (mm):")
         self.entry_width = self._add_dimension_field(content, "Šířka (mm):")
+        self.entry_count = self._add_dimension_field(content, "Počet:")
         self.price_result = ctk.CTkLabel(
             content,
             text="",
@@ -242,8 +256,9 @@ class ShadeInstallApp(ctk.CTk):
         try:
             width_mm = parse_dimension(self.entry_width.get(), "šířku")
             height_mm = parse_dimension(self.entry_height.get(), "výšku")
+            count = parse_count(self.entry_count.get())
         except ValueError as error:
-            messagebox.showerror("Neplatné rozměry", str(error), parent=self)
+            messagebox.showerror("Neplatné údaje", str(error), parent=self)
             return
 
         try:
@@ -266,7 +281,7 @@ class ShadeInstallApp(ctk.CTk):
         output_path = Path(selected_file)
         try:
             create_pricelist(
-                output_path, width_mm, height_mm, price
+                output_path, width_mm, height_mm, count, price
             )
         except Exception as error:
             messagebox.showerror(
