@@ -38,11 +38,24 @@ def parse_count(value: str) -> int:
     return count
 
 
+def calculate_holder_count(width_cm: Decimal) -> int:
+    if width_cm <= 160:
+        return 2
+    if width_cm <= 240:
+        return 3
+    if width_cm <= 320:
+        return 4
+    if width_cm <= 420:
+        return 5
+    return 6
+
+
 TEMPLATE_FILE = "data/cenik_vzor.xlsx"
 PRICE_FILES = {"Zetta 90": "data/ceny_zetta90.xlsx"}
 TEMPLATE_CELLS = {
     "width_cm": "E23",
     "height_cm": "F23",
+    "holder_count": "C23",
     "count": "G23",
     "price": "I23",
     "quote_number": "K9",
@@ -88,6 +101,7 @@ def create_pricelist(
     output_path: Path,
     width_cm: Decimal,
     height_cm: Decimal,
+    holder_count: int,
     count: int,
     quote_number: str,
     price: int,
@@ -102,6 +116,7 @@ def create_pricelist(
         values = {
             "width_cm": float(width_cm),
             "height_cm": float(height_cm),
+            "holder_count": holder_count,
             "count": count,
             "quote_number": quote_number,
             "price": price,
@@ -294,6 +309,7 @@ class ShadeInstallApp(ctk.CTk):
             messagebox.showerror("Neplatné údaje", str(error), parent=self)
             return
 
+        holder_count = calculate_holder_count(width_cm)
         width_mm = width_cm * 10
         height_mm = height_cm * 10
 
@@ -319,7 +335,13 @@ class ShadeInstallApp(ctk.CTk):
         output_path = Path(selected_file)
         try:
             create_pricelist(
-                output_path, width_cm, height_cm, count, quote_number, price
+                output_path,
+                width_cm,
+                height_cm,
+                holder_count,
+                count,
+                quote_number,
+                price,
             )
         except Exception as error:
             messagebox.showerror(
