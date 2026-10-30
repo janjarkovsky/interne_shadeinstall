@@ -1,7 +1,7 @@
 # ShadeInstall
 
-Desktopová aplikace ShadeInstall připravuje cenové nabídky pro žaluzie Zetta90 a
-Zetta 90 - BAL. Podporuje až 14 položek stejného typu v jedné nabídce, vyhledá
+Desktopová aplikace ShadeInstall připravuje cenové nabídky pro žaluzie Zetta 90 - Standart a
+Zetta 90 - RAL. Podporuje až 14 položek stejného typu v jedné nabídce, vyhledá
 cenu podle rozměrů a vyplní kopii odpovídajícího vzoru. Původní vzory zůstávají
 nezměněné.
 

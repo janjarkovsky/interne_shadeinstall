@@ -167,12 +167,12 @@ def _delete_unused_item_rows(worksheet, item_count: int) -> None:
 
 
 TEMPLATE_FILES = {
-    "Zetta90": "data/vzor_cenik_zetta90.xlsx",
-    "Zetta 90 - BAL": "data/vzor_cennik_zetta90_bal.xlsx",
+    "Zetta 90 - Standart": "data/vzor_cenik_zetta90.xlsx",
+    "Zetta 90 - RAL": "data/vzor_cennik_zetta90_bal.xlsx",
 }
 PRICE_FILES = {
-    "Zetta90": "data/ceny_zetta90.xlsx",
-    "Zetta 90 - BAL": "data/ceny_zetta90.xlsx",
+    "Zetta 90 - Standart": "data/ceny_zetta90.xlsx",
+    "Zetta 90 - RAL": "data/ceny_zetta90.xlsx",
 }
 ITEM_START_ROW = 23
 MAX_BLIND_ITEMS = 14
@@ -253,7 +253,7 @@ def create_pricelist(
         workbook.close()
 
 
-BLIND_TYPES = ["Zetta90", "Zetta 90 - BAL"]
+BLIND_TYPES = ["Zetta 90 - Standart", "Zetta 90 - RAL"]
 
 
 class ShadeInstallApp(ctk.CTk):
@@ -412,7 +412,7 @@ class ShadeInstallApp(ctk.CTk):
         self.margin_enabled = BooleanVar(master=self, value=True)
         self.margin_checkbox = ctk.CTkCheckBox(
             content,
-            text="Započítat 10% marži",
+            text="Započítat +10% nad ceník",
             variable=self.margin_enabled,
             onvalue=True,
             offvalue=False,
@@ -434,7 +434,7 @@ class ShadeInstallApp(ctk.CTk):
         self.price_result.pack(anchor="w", padx=30, pady=(0, 8))
         self.create_button = ctk.CTkButton(
             content,
-            text="Vytvořit ceník",
+            text="Vytvořit cenovou nabídku",
             fg_color="#0d6efd",
             hover_color="#0b5ed7",
             text_color="#ffffff",
@@ -622,6 +622,8 @@ class ShadeInstallApp(ctk.CTk):
                 parent=self,
             )
             return
+        customer_surname = customer_name.split()[-1]
+        customer_label = f"p. {customer_surname}"
         customer_name = re.sub(
             r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name
         ).strip(" .")
@@ -703,7 +705,6 @@ class ShadeInstallApp(ctk.CTk):
         self.price_result.configure(
             text=f"Celková cena: {total_price:,} Kč".replace(",", " ")
         )
-        customer_surname = customer_name.split()[-1]
         default_filename = (
             f"{quote_number_for_filename}, p. {customer_surname}, "
             f"venkovní žaluzie {self.blind_type.get()}.xlsx"
@@ -724,7 +725,7 @@ class ShadeInstallApp(ctk.CTk):
                 output_path,
                 items,
                 quote_number,
-                customer_name,
+                customer_label,
                 installation_location,
                 self.blind_type.get(),
             )
