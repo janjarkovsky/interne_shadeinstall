@@ -54,6 +54,7 @@ TEMPLATE_FILE = "data/cenik_vzor_zetta90.xlsx"
 PRICE_FILES = {"Zetta 90": "data/ceny_zetta90.xlsx"}
 ITEM_START_ROW = 23
 MAX_BLIND_ITEMS = 14
+MIN_ALLOWED_WIDTH_CM = Decimal("60")
 
 
 def lookup_price(blind_type: str, width_mm: Decimal, height_mm: Decimal) -> int:
@@ -350,6 +351,19 @@ class ShadeInstallApp(ctk.CTk):
         self.calculate_and_write()
         return "break"
 
+    @staticmethod
+    def _update_width_warning(width_entry, warning_frame) -> None:
+        try:
+            width_cm = parse_dimension(width_entry.get(), "šířku")
+        except ValueError:
+            warning_frame.grid_remove()
+            return
+
+        if width_cm < MIN_ALLOWED_WIDTH_CM:
+            warning_frame.grid()
+        else:
+            warning_frame.grid_remove()
+
     def add_blind_item(self, focus_new: bool = True) -> None:
         if len(self.blind_items) >= MAX_BLIND_ITEMS:
             return
@@ -374,8 +388,32 @@ class ShadeInstallApp(ctk.CTk):
             font=("Segoe UI", 13),
             text_color="#475569",
         ).grid(row=0, column=0, padx=5, sticky="w")
-        width_entry = self._create_item_entry(row_frame, 170)
-        width_entry.grid(row=0, column=1, padx=5, sticky="w")
+        width_field = ctk.CTkFrame(row_frame, fg_color="transparent")
+        width_field.grid(row=0, column=1, padx=5, sticky="w")
+        width_entry = self._create_item_entry(width_field, 170)
+        width_entry.grid(row=0, column=0, padx=(0, 8), sticky="w")
+        warning_frame = ctk.CTkFrame(width_field, fg_color="transparent")
+        warning_frame.grid(row=0, column=1, sticky="w")
+        ctk.CTkLabel(
+            warning_frame,
+            text="!",
+            font=("Segoe UI", 14, "bold"),
+            text_color="#b42318",
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkLabel(
+            warning_frame,
+            text="Žaluzie je pod povolený rozměr",
+            font=("Segoe UI", 10),
+            text_color="#b42318",
+            wraplength=150,
+            justify="left",
+        ).pack(side="left")
+        warning_frame.grid_remove()
+        update_warning = lambda _event: self._update_width_warning(
+            width_entry, warning_frame
+        )
+        width_entry.bind("<KeyRelease>", update_warning, add="+")
+        width_entry.bind("<FocusOut>", update_warning, add="+")
         height_entry = self._create_item_entry(row_frame, 170)
         height_entry.grid(row=0, column=2, padx=5, sticky="w")
         count_entry = self._create_item_entry(row_frame, 130)
@@ -393,6 +431,7 @@ class ShadeInstallApp(ctk.CTk):
             {
                 "frame": row_frame,
                 "width": width_entry,
+                "width_warning": warning_frame,
                 "height": height_entry,
                 "count": count_entry,
             }
@@ -524,6 +563,7 @@ class ShadeInstallApp(ctk.CTk):
         self.blind_items = self.blind_items[:1]
         for field in ("width", "height", "count"):
             self.blind_items[0][field].delete(0, "end")
+        self.blind_items[0]["width_warning"].grid_remove()
         self.add_blind_button.configure(state="normal")
         self.price_result.configure(text="")
         self.blind_type.set(BLIND_TYPES[0])
