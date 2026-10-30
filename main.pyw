@@ -50,16 +50,10 @@ def calculate_holder_count(width_cm: Decimal) -> int:
     return 6
 
 
-TEMPLATE_FILE = "data/cenik_vzor.xlsx"
+TEMPLATE_FILE = "data/cenik_vzor_zetta90.xlsx"
 PRICE_FILES = {"Zetta 90": "data/ceny_zetta90.xlsx"}
-TEMPLATE_CELLS = {
-    "width_cm": "E23",
-    "height_cm": "F23",
-    "holder_count": "C23",
-    "count": "G23",
-    "price": "I23",
-    "quote_number": "K9",
-}
+ITEM_START_ROW = 23
+MAX_BLIND_ITEMS = 14
 
 
 def lookup_price(blind_type: str, width_mm: Decimal, height_mm: Decimal) -> int:
@@ -99,30 +93,29 @@ def lookup_price(blind_type: str, width_mm: Decimal, height_mm: Decimal) -> int:
 
 def create_pricelist(
     output_path: Path,
-    width_cm: Decimal,
-    height_cm: Decimal,
-    holder_count: int,
-    count: int,
+    items: list[dict],
     quote_number: str,
-    price: int,
 ) -> None:
     """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
+    if not 1 <= len(items) <= MAX_BLIND_ITEMS:
+        raise ValueError(f"Ceník musí obsahovat 1 až {MAX_BLIND_ITEMS} žaluzií.")
     template_path = resource_path(TEMPLATE_FILE)
     if not template_path.exists():
         raise FileNotFoundError(f"Chybí šablona {TEMPLATE_FILE}.")
     workbook = load_workbook(template_path)
     try:
         worksheet = workbook.active
-        values = {
-            "width_cm": float(width_cm),
-            "height_cm": float(height_cm),
-            "holder_count": holder_count,
-            "count": count,
-            "quote_number": quote_number,
-            "price": price,
-        }
-        for key, cell in TEMPLATE_CELLS.items():
-            worksheet[cell] = values[key]
+        worksheet["K9"] = quote_number
+        for item_index, item in enumerate(items):
+            row = ITEM_START_ROW + item_index
+            worksheet[f"B{row}"] = item["holder_count"]
+            worksheet[f"E{row}"] = float(item["width_cm"])
+            worksheet[f"F{row}"] = float(item["height_cm"])
+            worksheet[f"G{row}"] = item["count"]
+            worksheet[f"I{row}"] = item["price"]
+        workbook.calculation.fullCalcOnLoad = True
+        workbook.calculation.forceFullCalc = True
+        workbook.calculation.calcMode = "auto"
         workbook.save(output_path)
     finally:
         workbook.close()
@@ -232,12 +225,39 @@ class ShadeInstallApp(ctk.CTk):
         )
         self.blind_type.pack(anchor="w", padx=30, pady=(0, 12))
 
-        self.entry_width = self._add_text_field(content, "Šířka (cm):")
-        self.entry_height = self._add_text_field(content, "Výška (cm):")
-        self.entry_count = self._add_text_field(content, "Počet:")
         self.entry_quote_number = self._add_text_field(
             content, "Číslo cenové nabídky:"
         )
+        self.blind_items_frame = ctk.CTkFrame(content, fg_color="transparent")
+        self.blind_items_frame.pack(fill="x", padx=30, pady=(8, 8))
+        for column, label in enumerate(
+            ("Žaluzie", "Šířka (cm)", "Výška (cm)", "Počet")
+        ):
+            ctk.CTkLabel(
+                self.blind_items_frame,
+                text=label,
+                font=("Segoe UI", 12, "bold"),
+                text_color="#475569",
+            ).grid(row=0, column=column, padx=5, pady=(0, 4), sticky="w")
+        self.blind_items_frame.grid_columnconfigure(0, minsize=90)
+        for column in range(1, 4):
+            self.blind_items_frame.grid_columnconfigure(column, weight=1)
+
+        self.blind_items = []
+        self.add_blind_button = ctk.CTkButton(
+            content,
+            text="Přidat další žaluzii",
+            fg_color="#16803c",
+            hover_color="#126c32",
+            text_color="#ffffff",
+            corner_radius=8,
+            font=("Segoe UI", 12, "bold"),
+            width=260,
+            height=34,
+            command=self.add_blind_item,
+        )
+        self.add_blind_button.pack(anchor="w", padx=30, pady=(0, 12))
+        self.add_blind_item()
         self.price_result = ctk.CTkLabel(
             content,
             text="",
@@ -275,6 +295,59 @@ class ShadeInstallApp(ctk.CTk):
         entry.pack(anchor="w", padx=30, pady=(0, 12))
         return entry
 
+    @staticmethod
+    def _create_item_entry(parent: ctk.CTkFrame, width: int) -> ctk.CTkEntry:
+        return ctk.CTkEntry(
+            parent,
+            width=width,
+            height=36,
+            corner_radius=8,
+            fg_color="#f8f9fa",
+            border_color="#cbd5e1",
+            text_color="#1e293b",
+        )
+
+    def add_blind_item(self) -> None:
+        if len(self.blind_items) >= MAX_BLIND_ITEMS:
+            return
+
+        item_number = len(self.blind_items) + 1
+        row_frame = ctk.CTkFrame(self.blind_items_frame, fg_color="transparent")
+        row_frame.grid(
+            row=item_number,
+            column=0,
+            columnspan=4,
+            padx=0,
+            pady=3,
+            sticky="ew",
+        )
+        row_frame.grid_columnconfigure(0, minsize=90)
+        for column in range(1, 4):
+            row_frame.grid_columnconfigure(column, weight=1)
+
+        ctk.CTkLabel(
+            row_frame,
+            text=str(item_number),
+            font=("Segoe UI", 13),
+            text_color="#475569",
+        ).grid(row=0, column=0, padx=5, sticky="w")
+        width_entry = self._create_item_entry(row_frame, 170)
+        width_entry.grid(row=0, column=1, padx=5, sticky="w")
+        height_entry = self._create_item_entry(row_frame, 170)
+        height_entry.grid(row=0, column=2, padx=5, sticky="w")
+        count_entry = self._create_item_entry(row_frame, 130)
+        count_entry.grid(row=0, column=3, padx=5, sticky="w")
+        self.blind_items.append(
+            {
+                "frame": row_frame,
+                "width": width_entry,
+                "height": height_entry,
+                "count": count_entry,
+            }
+        )
+        if len(self.blind_items) >= MAX_BLIND_ITEMS:
+            self.add_blind_button.configure(state="disabled")
+
     def calculate_and_write(self) -> None:
         customer_name = self.entry_customer_name.get().strip()
         if not customer_name:
@@ -305,25 +378,63 @@ class ShadeInstallApp(ctk.CTk):
             return
         quote_number = f"{quote_number}-{datetime.now():%y}"
 
-        try:
-            width_cm = parse_dimension(self.entry_width.get(), "šířku")
-            height_cm = parse_dimension(self.entry_height.get(), "výšku")
-            count = parse_count(self.entry_count.get())
-        except ValueError as error:
-            messagebox.showerror("Neplatné údaje", str(error), parent=self)
+        items = []
+        for item_number, fields in enumerate(self.blind_items, start=1):
+            raw_values = (
+                fields["width"].get().strip(),
+                fields["height"].get().strip(),
+                fields["count"].get().strip(),
+            )
+            if not any(raw_values):
+                continue
+            try:
+                width_cm = parse_dimension(
+                    raw_values[0], f"šířku žaluzie {item_number}"
+                )
+                height_cm = parse_dimension(
+                    raw_values[1], f"výšku žaluzie {item_number}"
+                )
+                count = parse_count(raw_values[2])
+            except ValueError as error:
+                messagebox.showerror(
+                    "Neplatné údaje", str(error), parent=self
+                )
+                return
+
+            try:
+                price = lookup_price(
+                    self.blind_type.get(), width_cm * 10, height_cm * 10
+                )
+            except (FileNotFoundError, ValueError) as error:
+                self.price_result.configure(text="")
+                messagebox.showerror(
+                    "Cenu se nepodařilo vypočítat",
+                    f"Žaluzie {item_number}: {error}",
+                    parent=self,
+                )
+                return
+            items.append(
+                {
+                    "width_cm": width_cm,
+                    "height_cm": height_cm,
+                    "holder_count": calculate_holder_count(width_cm),
+                    "count": count,
+                    "price": price,
+                }
+            )
+
+        if not items:
+            messagebox.showerror(
+                "Chybí žaluzie",
+                "Vyplňte parametry alespoň jedné žaluzie.",
+                parent=self,
+            )
             return
 
-        holder_count = calculate_holder_count(width_cm)
-        width_mm = width_cm * 10
-        height_mm = height_cm * 10
-
-        try:
-            price = lookup_price(self.blind_type.get(), width_mm, height_mm)
-        except (FileNotFoundError, ValueError) as error:
-            self.price_result.configure(text="")
-            messagebox.showerror("Cenu se nepodařilo vypočítat", str(error), parent=self)
-            return
-        self.price_result.configure(text=f"Výsledná cena: {price:,} Kč".replace(",", " "))
+        total_price = sum(item["price"] * item["count"] for item in items)
+        self.price_result.configure(
+            text=f"Celková cena: {total_price:,} Kč".replace(",", " ")
+        )
 
         selected_file = filedialog.asksaveasfilename(
             title="Uložit nový ceník",
@@ -340,12 +451,8 @@ class ShadeInstallApp(ctk.CTk):
         try:
             create_pricelist(
                 output_path,
-                width_cm,
-                height_cm,
-                holder_count,
-                count,
+                items,
                 quote_number,
-                price,
             )
         except Exception as error:
             messagebox.showerror(
@@ -356,14 +463,14 @@ class ShadeInstallApp(ctk.CTk):
         messagebox.showinfo(
             "Ceník vytvořen", f"Nový ceník:\n{output_path}", parent=self
         )
-        for entry in (
-            self.entry_customer_name,
-            self.entry_width,
-            self.entry_height,
-            self.entry_count,
-            self.entry_quote_number,
-        ):
+        for entry in (self.entry_customer_name, self.entry_quote_number):
             entry.delete(0, "end")
+        for item in self.blind_items[1:]:
+            item["frame"].destroy()
+        self.blind_items = self.blind_items[:1]
+        for field in ("width", "height", "count"):
+            self.blind_items[0][field].delete(0, "end")
+        self.add_blind_button.configure(state="normal")
         self.price_result.configure(text="")
         self.blind_type.set(BLIND_TYPES[0])
 

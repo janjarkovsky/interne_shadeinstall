@@ -1,14 +1,9 @@
 # ShadeInstall
 
-Desktopová aplikace ShadeInstall v CustomTkinteru s modulem přípravy cenové
-nabídky. Sidebar obsahuje jen tento modul; profil a další moduly jsou odebrané.
-Logo je zobrazené vedle názvu ShadeInstall. Zadané rozměry aplikace použije
-k výpočtu plochy v m² a zapíše je do nového
-listu `Výpočty ShadeInstall` v kopii vybraného sešitu `.xlsx` nebo `.xlsm`.
-Původní soubor zůstává nezměněný a stávající listy se vzorci se nepřepisují.
-
-Cena v Kč zatím není vypočítávána: k tomu jsou potřeba sazby a konkrétní
-struktura ceníku.
+Desktopová aplikace ShadeInstall připravuje cenové nabídky pro žaluzie Zetta 90.
+Podporuje až 14 položek stejného typu v jedné nabídce, vyhledá cenu podle
+rozměrů a vyplní kopii vzoru `data/cenik_vzor_zetta90.xlsx`. Původní vzor zůstává
+nezměněný.
 
 ## Vytvoření EXE ve Windows
 
@@ -16,7 +11,7 @@ V prostředí s nainstalovaným Pythonem spusťte v této složce:
 
 ```powershell
 py -m pip install customtkinter openpyxl pyinstaller
-py -m PyInstaller --noconsole --onefile --name ShadeInstall --collect-all customtkinter --icon=logo.ico --add-data=logo.ico:. --add-data=logo_mark.png:. main.pyw
+py -m PyInstaller --noconsole --onefile --name ShadeInstall --collect-all customtkinter --icon=logo.ico --add-data=logo.ico:. --add-data=logo_mark.png:. --add-data=data/ceny_zetta90.xlsx:data --add-data=data/cenik_vzor_zetta90.xlsx:data main.pyw
 ```
 
 Výsledný soubor `ShadeInstall.exe` bude ve složce `dist`. Cílový uživatel k jeho spuštění
