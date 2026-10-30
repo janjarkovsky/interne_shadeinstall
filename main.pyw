@@ -1,7 +1,7 @@
 """ShadeInstall - Interní Aplikace."""
 
+import re
 import sys
-from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -186,13 +186,10 @@ class ShadeInstallApp(ctk.CTk):
             self.main_container, fg_color="#ffffff", corner_radius=12
         )
         content.grid(row=1, column=0, padx=25, pady=25, sticky="nsew")
-        ctk.CTkLabel(
-            content,
-            text="Parametry žaluzie",
-            font=("Segoe UI", 16, "bold"),
-            text_color="#1e293b",
-        ).pack(anchor="w", padx=30, pady=(30, 15))
 
+        self.entry_customer_name = self._add_text_field(
+            content, "Jméno zákazníka:"
+        )
         ctk.CTkLabel(
             content,
             text="Výběr žaluzie:",
@@ -212,9 +209,9 @@ class ShadeInstallApp(ctk.CTk):
         )
         self.blind_type.pack(anchor="w", padx=30, pady=(0, 12))
 
-        self.entry_width = self._add_dimension_field(content, "Šířka (cm):")
-        self.entry_height = self._add_dimension_field(content, "Výška (cm):")
-        self.entry_count = self._add_dimension_field(content, "Počet:")
+        self.entry_width = self._add_text_field(content, "Šířka (cm):")
+        self.entry_height = self._add_text_field(content, "Výška (cm):")
+        self.entry_count = self._add_text_field(content, "Počet:")
         self.price_result = ctk.CTkLabel(
             content,
             text="",
@@ -236,7 +233,7 @@ class ShadeInstallApp(ctk.CTk):
         ).pack(anchor="w", padx=30, pady=10)
 
     @staticmethod
-    def _add_dimension_field(parent: ctk.CTkFrame, label: str) -> ctk.CTkEntry:
+    def _add_text_field(parent: ctk.CTkFrame, label: str) -> ctk.CTkEntry:
         ctk.CTkLabel(
             parent, text=label, font=("Segoe UI", 13), text_color="#475569"
         ).pack(anchor="w", padx=30, pady=(5, 2))
@@ -253,6 +250,25 @@ class ShadeInstallApp(ctk.CTk):
         return entry
 
     def calculate_and_write(self) -> None:
+        customer_name = self.entry_customer_name.get().strip()
+        if not customer_name:
+            messagebox.showerror(
+                "Chybí jméno zákazníka",
+                "Zadejte jméno zákazníka.",
+                parent=self,
+            )
+            return
+        customer_name = re.sub(
+            r'[<>:"/\\|?*\x00-\x1f]', "_", customer_name
+        ).strip(" .")
+        if not customer_name:
+            messagebox.showerror(
+                "Neplatné jméno zákazníka",
+                "Zadejte jméno obsahující znaky použitelné v názvu souboru.",
+                parent=self,
+            )
+            return
+
         try:
             width_cm = parse_dimension(self.entry_width.get(), "šířku")
             height_cm = parse_dimension(self.entry_height.get(), "výšku")
@@ -275,7 +291,9 @@ class ShadeInstallApp(ctk.CTk):
         selected_file = filedialog.asksaveasfilename(
             title="Uložit nový ceník",
             defaultextension=".xlsx",
-            initialfile=f"Cenik_{datetime.now():%Y%m%d_%H%M%S}.xlsx",
+            initialfile=(
+                f"Ceník ({customer_name}) ({self.blind_type.get()}).xlsx"
+            ),
             filetypes=(("Excel sešit", "*.xlsx"),),
             parent=self,
         )
