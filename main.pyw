@@ -120,7 +120,7 @@ class ShadeInstallApp(ctk.CTk):
     def __init__(self) -> None:
         super().__init__()
         self.title("ShadeInstall - Interní Aplikace")
-        self.geometry("1050x700")
+        self.geometry("1365x910")
         self.minsize(850, 600)
         self.configure(fg_color="#f8f9fa")
         self.iconbitmap(str(resource_path("logo.ico")))
