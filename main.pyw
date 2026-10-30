@@ -134,7 +134,26 @@ def _delete_unused_item_rows(worksheet, item_count: int) -> None:
         for index, dimension in worksheet.row_dimensions.items()
     }
     print_area = worksheet.print_area
+    images_to_shift = []
+    for image in worksheet._images:
+        anchor = image.anchor
+        start_marker = anchor._from
+        end_marker = getattr(anchor, "to", None)
+        if start_marker.row >= delete_start and (
+            end_marker is None or end_marker.row >= delete_start
+        ):
+            images_to_shift.append((start_marker, end_marker))
+        elif end_marker is not None and end_marker.row >= delete_start:
+            raise ValueError(
+                "Obrázek překrývá oblast mazaných řádků šablony."
+            )
+
     worksheet.delete_rows(delete_start, deleted_count)
+
+    for start_marker, end_marker in images_to_shift:
+        start_marker.row -= deleted_count
+        if end_marker is not None:
+            end_marker.row -= deleted_count
 
     for index in list(worksheet.row_dimensions):
         del worksheet.row_dimensions[index]
