@@ -196,6 +196,7 @@ PRICE_FILES = {
 ITEM_START_ROW = 23
 MAX_BLIND_ITEMS = 14
 MIN_ALLOWED_WIDTH_CM = Decimal("60")
+MAX_ALLOWED_HEIGHT_CM = Decimal("400")
 
 
 def lookup_price(blind_type: str, width_mm: Decimal, height_mm: Decimal) -> int:
@@ -555,6 +556,19 @@ class ShadeInstallApp(ctk.CTk):
         else:
             warning_frame.grid_remove()
 
+    @staticmethod
+    def _update_height_warning(height_entry, warning_frame) -> None:
+        try:
+            height_cm = parse_dimension(height_entry.get(), "výšku")
+        except ValueError:
+            warning_frame.grid_remove()
+            return
+
+        if height_cm > MAX_ALLOWED_HEIGHT_CM:
+            warning_frame.grid()
+        else:
+            warning_frame.grid_remove()
+
     def add_blind_item(self, focus_new: bool = True) -> None:
         if len(self.blind_items) >= MAX_BLIND_ITEMS:
             return
@@ -605,8 +619,32 @@ class ShadeInstallApp(ctk.CTk):
         )
         width_entry.bind("<KeyRelease>", update_warning, add="+")
         width_entry.bind("<FocusOut>", update_warning, add="+")
-        height_entry = self._create_item_entry(row_frame, 170)
-        height_entry.grid(row=0, column=2, padx=5, sticky="nw")
+        height_field = ctk.CTkFrame(row_frame, fg_color="transparent")
+        height_field.grid(row=0, column=2, padx=5, sticky="nw")
+        height_entry = self._create_item_entry(height_field, 170)
+        height_entry.grid(row=0, column=0, padx=(0, 8), sticky="w")
+        height_warning = ctk.CTkFrame(height_field, fg_color="transparent")
+        height_warning.grid(row=1, column=0, pady=(2, 0), sticky="w")
+        ctk.CTkLabel(
+            height_warning,
+            text="!",
+            font=("Segoe UI", 14, "bold"),
+            text_color="#b42318",
+        ).pack(side="left", padx=(0, 4))
+        ctk.CTkLabel(
+            height_warning,
+            text="Žaluzie je nad povolený rozměr",
+            font=("Segoe UI", 10),
+            text_color="#b42318",
+            wraplength=150,
+            justify="left",
+        ).pack(side="left")
+        height_warning.grid_remove()
+        update_height_warning = lambda _event: self._update_height_warning(
+            height_entry, height_warning
+        )
+        height_entry.bind("<KeyRelease>", update_height_warning, add="+")
+        height_entry.bind("<FocusOut>", update_height_warning, add="+")
         count_entry = self._create_item_entry(row_frame, 130)
         count_entry.grid(row=0, column=3, padx=5, sticky="nw")
         self._bind_enter(width_entry, height_entry)
@@ -624,6 +662,7 @@ class ShadeInstallApp(ctk.CTk):
                 "width": width_entry,
                 "width_warning": warning_frame,
                 "height": height_entry,
+                "height_warning": height_warning,
                 "count": count_entry,
             }
         )
@@ -682,6 +721,10 @@ class ShadeInstallApp(ctk.CTk):
                 height_cm = parse_dimension(
                     raw_values[1], f"výšku žaluzie {item_number}"
                 )
+                if height_cm > MAX_ALLOWED_HEIGHT_CM:
+                    raise ValueError(
+                        f"Výška žaluzie {item_number} nesmí překročit 400 cm."
+                    )
                 count = parse_count(raw_values[2])
             except ValueError as error:
                 messagebox.showerror(
@@ -769,6 +812,7 @@ class ShadeInstallApp(ctk.CTk):
         for field in ("width", "height", "count"):
             self.blind_items[0][field].delete(0, "end")
         self.blind_items[0]["width_warning"].grid_remove()
+        self.blind_items[0]["height_warning"].grid_remove()
         self.add_blind_button.configure(state="normal")
         self.price_result.configure(text="")
         self.blind_type.set(BLIND_TYPES[0])
