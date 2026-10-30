@@ -40,8 +40,8 @@ def parse_count(value: str) -> int:
 TEMPLATE_FILE = "data/cenik_vzor.xlsx"
 PRICE_FILES = {"Zetta 90": "data/ceny_zetta90.xlsx"}
 TEMPLATE_CELLS = {
-    "width_mm": "E23",
-    "height_mm": "F23",
+    "width_cm": "E23",
+    "height_cm": "F23",
     "count": "G23",
     "price": "I23",
 }
@@ -84,8 +84,8 @@ def lookup_price(blind_type: str, width_mm: Decimal, height_mm: Decimal) -> int:
 
 def create_pricelist(
     output_path: Path,
-    width_mm: Decimal,
-    height_mm: Decimal,
+    width_cm: Decimal,
+    height_cm: Decimal,
     count: int,
     price: int,
 ) -> None:
@@ -97,8 +97,8 @@ def create_pricelist(
     try:
         worksheet = workbook.active
         values = {
-            "width_mm": float(width_mm),
-            "height_mm": float(height_mm),
+            "width_cm": float(width_cm),
+            "height_cm": float(height_cm),
             "count": count,
             "price": price,
         }
@@ -212,8 +212,8 @@ class ShadeInstallApp(ctk.CTk):
         )
         self.blind_type.pack(anchor="w", padx=30, pady=(0, 12))
 
-        self.entry_height = self._add_dimension_field(content, "Výška (mm):")
-        self.entry_width = self._add_dimension_field(content, "Šířka (mm):")
+        self.entry_width = self._add_dimension_field(content, "Šířka (cm):")
+        self.entry_height = self._add_dimension_field(content, "Výška (cm):")
         self.entry_count = self._add_dimension_field(content, "Počet:")
         self.price_result = ctk.CTkLabel(
             content,
@@ -254,12 +254,15 @@ class ShadeInstallApp(ctk.CTk):
 
     def calculate_and_write(self) -> None:
         try:
-            width_mm = parse_dimension(self.entry_width.get(), "šířku")
-            height_mm = parse_dimension(self.entry_height.get(), "výšku")
+            width_cm = parse_dimension(self.entry_width.get(), "šířku")
+            height_cm = parse_dimension(self.entry_height.get(), "výšku")
             count = parse_count(self.entry_count.get())
         except ValueError as error:
             messagebox.showerror("Neplatné údaje", str(error), parent=self)
             return
+
+        width_mm = width_cm * 10
+        height_mm = height_cm * 10
 
         try:
             price = lookup_price(self.blind_type.get(), width_mm, height_mm)
@@ -281,7 +284,7 @@ class ShadeInstallApp(ctk.CTk):
         output_path = Path(selected_file)
         try:
             create_pricelist(
-                output_path, width_mm, height_mm, count, price
+                output_path, width_cm, height_cm, count, price
             )
         except Exception as error:
             messagebox.showerror(
