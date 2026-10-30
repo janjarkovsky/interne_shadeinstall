@@ -2,6 +2,7 @@
 
 import re
 import sys
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -44,6 +45,7 @@ TEMPLATE_CELLS = {
     "height_cm": "F23",
     "count": "G23",
     "price": "I23",
+    "quote_number": "K9",
 }
 
 
@@ -87,6 +89,7 @@ def create_pricelist(
     width_cm: Decimal,
     height_cm: Decimal,
     count: int,
+    quote_number: str,
     price: int,
 ) -> None:
     """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
@@ -100,6 +103,7 @@ def create_pricelist(
             "width_cm": float(width_cm),
             "height_cm": float(height_cm),
             "count": count,
+            "quote_number": quote_number,
             "price": price,
         }
         for key, cell in TEMPLATE_CELLS.items():
@@ -212,6 +216,9 @@ class ShadeInstallApp(ctk.CTk):
         self.entry_width = self._add_text_field(content, "Šířka (cm):")
         self.entry_height = self._add_text_field(content, "Výška (cm):")
         self.entry_count = self._add_text_field(content, "Počet:")
+        self.entry_quote_number = self._add_text_field(
+            content, "Číslo cenové nabídky:"
+        )
         self.price_result = ctk.CTkLabel(
             content,
             text="",
@@ -269,6 +276,16 @@ class ShadeInstallApp(ctk.CTk):
             )
             return
 
+        quote_number = self.entry_quote_number.get().strip()
+        if not quote_number:
+            messagebox.showerror(
+                "Chybí číslo cenové nabídky",
+                "Zadejte číslo cenové nabídky.",
+                parent=self,
+            )
+            return
+        quote_number = f"{quote_number}-{datetime.now():%y}"
+
         try:
             width_cm = parse_dimension(self.entry_width.get(), "šířku")
             height_cm = parse_dimension(self.entry_height.get(), "výšku")
@@ -302,7 +319,7 @@ class ShadeInstallApp(ctk.CTk):
         output_path = Path(selected_file)
         try:
             create_pricelist(
-                output_path, width_cm, height_cm, count, price
+                output_path, width_cm, height_cm, count, quote_number, price
             )
         except Exception as error:
             messagebox.showerror(
