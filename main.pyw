@@ -6,7 +6,7 @@ from copy import copy
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import BooleanVar, filedialog, messagebox
 
 import customtkinter as ctk
 from openpyxl import load_workbook
@@ -50,6 +50,12 @@ def calculate_holder_count(width_cm: Decimal) -> int:
     if width_cm <= 420:
         return 5
     return 6
+
+
+def apply_margin(price: int, enabled: bool) -> int:
+    if not enabled:
+        return price
+    return (price * 11 + 9) // 10
 
 
 def _shift_formula_rows(
@@ -403,6 +409,21 @@ class ShadeInstallApp(ctk.CTk):
             command=lambda: self.add_blind_item(focus_new=True),
         )
         self.add_blind_button.pack(anchor="w", padx=30, pady=(0, 12))
+        self.margin_enabled = BooleanVar(master=self, value=True)
+        self.margin_checkbox = ctk.CTkCheckBox(
+            content,
+            text="Započítat 10% marži",
+            variable=self.margin_enabled,
+            onvalue=True,
+            offvalue=False,
+            checkbox_width=18,
+            checkbox_height=18,
+            fg_color="#16803c",
+            hover_color="#126c32",
+            text_color="#1e293b",
+            font=("Segoe UI", 13),
+        )
+        self.margin_checkbox.pack(anchor="w", padx=30, pady=(0, 12))
         self.add_blind_item(focus_new=False)
         self.price_result = ctk.CTkLabel(
             content,
@@ -648,7 +669,7 @@ class ShadeInstallApp(ctk.CTk):
                 return
 
             try:
-                price = lookup_price(
+                base_price = lookup_price(
                     self.blind_type.get(), width_cm * 10, height_cm * 10
                 )
             except (FileNotFoundError, ValueError) as error:
@@ -659,6 +680,7 @@ class ShadeInstallApp(ctk.CTk):
                     parent=self,
                 )
                 return
+            price = apply_margin(base_price, self.margin_enabled.get())
             items.append(
                 {
                     "width_cm": width_cm,
