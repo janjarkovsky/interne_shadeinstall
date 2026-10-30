@@ -160,8 +160,14 @@ def _delete_unused_item_rows(worksheet, item_count: int) -> None:
         )
 
 
-TEMPLATE_FILE = "data/cenik_vzor_zetta90.xlsx"
-PRICE_FILES = {"Zetta 90": "data/ceny_zetta90.xlsx"}
+TEMPLATE_FILES = {
+    "Zetta90": "data/vzor_cenik_zetta90.xlsx",
+    "Zetta 90 - BAL": "data/vzor_cennik_zetta90_bal.xlsx",
+}
+PRICE_FILES = {
+    "Zetta90": "data/ceny_zetta90.xlsx",
+    "Zetta 90 - BAL": "data/ceny_zetta90.xlsx",
+}
 ITEM_START_ROW = 23
 MAX_BLIND_ITEMS = 14
 MIN_ALLOWED_WIDTH_CM = Decimal("60")
@@ -208,13 +214,17 @@ def create_pricelist(
     quote_number: str,
     customer_name: str,
     installation_location: str,
+    blind_type: str,
 ) -> None:
     """Vyplní kopii šablony zadanými parametry a uloží ji jako nový soubor."""
     if not 1 <= len(items) <= MAX_BLIND_ITEMS:
         raise ValueError(f"Ceník musí obsahovat 1 až {MAX_BLIND_ITEMS} žaluzií.")
-    template_path = resource_path(TEMPLATE_FILE)
+    template_file = TEMPLATE_FILES.get(blind_type)
+    if template_file is None:
+        raise ValueError(f"Pro žaluzii {blind_type} není k dispozici vzor.")
+    template_path = resource_path(template_file)
     if not template_path.exists():
-        raise FileNotFoundError(f"Chybí šablona {TEMPLATE_FILE}.")
+        raise FileNotFoundError(f"Chybí šablona {template_file}.")
     workbook = load_workbook(template_path)
     try:
         worksheet = workbook.active
@@ -237,7 +247,7 @@ def create_pricelist(
         workbook.close()
 
 
-BLIND_TYPES = ["Zetta 90"]
+BLIND_TYPES = ["Zetta90", "Zetta 90 - BAL"]
 
 
 class ShadeInstallApp(ctk.CTk):
@@ -610,6 +620,7 @@ class ShadeInstallApp(ctk.CTk):
                 parent=self,
             )
             return
+        quote_number_for_filename = quote_number
         quote_number = f"{quote_number}-{datetime.now():%y}"
         installation_location = self.entry_installation_location.get().strip()
 
@@ -670,13 +681,16 @@ class ShadeInstallApp(ctk.CTk):
         self.price_result.configure(
             text=f"Celková cena: {total_price:,} Kč".replace(",", " ")
         )
+        customer_surname = customer_name.split()[-1]
+        default_filename = (
+            f"{quote_number_for_filename}, p. {customer_surname}, "
+            f"venkovní žaluzie {self.blind_type.get()}.xlsx"
+        )
 
         selected_file = filedialog.asksaveasfilename(
             title="Uložit nový ceník",
             defaultextension=".xlsx",
-            initialfile=(
-                f"Ceník ({customer_name}) ({self.blind_type.get()}).xlsx"
-            ),
+            initialfile=default_filename,
             filetypes=(("Excel sešit", "*.xlsx"),),
             parent=self,
         )
@@ -690,6 +704,7 @@ class ShadeInstallApp(ctk.CTk):
                 quote_number,
                 customer_name,
                 installation_location,
+                self.blind_type.get(),
             )
         except Exception as error:
             messagebox.showerror(
