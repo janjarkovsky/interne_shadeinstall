@@ -254,10 +254,10 @@ class ShadeInstallApp(ctk.CTk):
             font=("Segoe UI", 12, "bold"),
             width=260,
             height=34,
-            command=self.add_blind_item,
+            command=lambda: self.add_blind_item(focus_new=True),
         )
         self.add_blind_button.pack(anchor="w", padx=30, pady=(0, 12))
-        self.add_blind_item()
+        self.add_blind_item(focus_new=False)
         self.price_result = ctk.CTkLabel(
             content,
             text="",
@@ -265,7 +265,7 @@ class ShadeInstallApp(ctk.CTk):
             text_color="#16803c",
         )
         self.price_result.pack(anchor="w", padx=30, pady=(0, 8))
-        ctk.CTkButton(
+        self.create_button = ctk.CTkButton(
             content,
             text="Vytvořit ceník",
             fg_color="#0d6efd",
@@ -276,7 +276,18 @@ class ShadeInstallApp(ctk.CTk):
             width=320,
             height=42,
             command=self.calculate_and_write,
-        ).pack(anchor="w", padx=30, pady=10)
+        )
+        self.create_button.pack(anchor="w", padx=30, pady=10)
+
+        self._bind_enter(self.entry_customer_name, self.blind_type)
+        self._bind_enter(self.blind_type, self.entry_quote_number)
+        self._bind_enter(self.entry_quote_number, self.blind_items[0]["width"])
+        self.add_blind_button.bind(
+            "<Return>", self._handle_add_blind_enter, add="+"
+        )
+        self.create_button.bind(
+            "<Return>", self._handle_create_enter, add="+"
+        )
 
     @staticmethod
     def _add_text_field(parent: ctk.CTkFrame, label: str) -> ctk.CTkEntry:
@@ -307,7 +318,39 @@ class ShadeInstallApp(ctk.CTk):
             text_color="#1e293b",
         )
 
-    def add_blind_item(self) -> None:
+    @staticmethod
+    def _move_focus(_event, target) -> str:
+        target.focus_set()
+        return "break"
+
+    def _bind_enter(self, widget, target) -> None:
+        widget.bind(
+            "<Return>",
+            lambda event, next_widget=target: self._move_focus(
+                event, next_widget
+            ),
+            add="+",
+        )
+
+    def _focus_after_item(self, event, item_index: int) -> str:
+        next_index = item_index + 1
+        if next_index < len(self.blind_items):
+            target = self.blind_items[next_index]["width"]
+        elif len(self.blind_items) < MAX_BLIND_ITEMS:
+            target = self.add_blind_button
+        else:
+            target = self.create_button
+        return self._move_focus(event, target)
+
+    def _handle_add_blind_enter(self, _event) -> str:
+        self.add_blind_item(focus_new=True)
+        return "break"
+
+    def _handle_create_enter(self, _event) -> str:
+        self.calculate_and_write()
+        return "break"
+
+    def add_blind_item(self, focus_new: bool = True) -> None:
         if len(self.blind_items) >= MAX_BLIND_ITEMS:
             return
 
@@ -337,6 +380,15 @@ class ShadeInstallApp(ctk.CTk):
         height_entry.grid(row=0, column=2, padx=5, sticky="w")
         count_entry = self._create_item_entry(row_frame, 130)
         count_entry.grid(row=0, column=3, padx=5, sticky="w")
+        self._bind_enter(width_entry, height_entry)
+        self._bind_enter(height_entry, count_entry)
+        count_entry.bind(
+            "<Return>",
+            lambda event, index=item_number - 1: self._focus_after_item(
+                event, index
+            ),
+            add="+",
+        )
         self.blind_items.append(
             {
                 "frame": row_frame,
@@ -347,6 +399,8 @@ class ShadeInstallApp(ctk.CTk):
         )
         if len(self.blind_items) >= MAX_BLIND_ITEMS:
             self.add_blind_button.configure(state="disabled")
+        if focus_new:
+            width_entry.focus_set()
 
     def calculate_and_write(self) -> None:
         customer_name = self.entry_customer_name.get().strip()
