@@ -2,6 +2,7 @@
 
 import re
 import sys
+from copy import copy
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -9,6 +10,7 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 from openpyxl import load_workbook
+from openpyxl.utils.cell import get_column_letter, range_boundaries
 from PIL import Image
 
 
@@ -48,6 +50,114 @@ def calculate_holder_count(width_cm: Decimal) -> int:
     if width_cm <= 420:
         return 5
     return 6
+
+
+def _shift_formula_rows(
+    formula: str, delete_start: int, delete_end: int, deleted_count: int
+) -> str:
+    reference_pattern = re.compile(
+        r"(?<![A-Z0-9_.])(?:(?P<range>\$?[A-Z]{1,3}\$?\d+:\$?[A-Z]{1,3}\$?\d+)"
+        r"|(?P<cell>\$?[A-Z]{1,3}\$?\d+))(?![A-Z0-9_])",
+        re.IGNORECASE,
+    )
+    cell_pattern = re.compile(r"(\$?[A-Z]{1,3}\$?)(\d+)", re.IGNORECASE)
+
+    def shift_cell(reference: str) -> str:
+        match = cell_pattern.fullmatch(reference)
+        if match is None:
+            return reference
+        row = int(match.group(2))
+        if delete_start <= row <= delete_end:
+            return "#REF!"
+        if row > delete_end:
+            row -= deleted_count
+        return f"{match.group(1)}{row}"
+
+    def replace_reference(match: re.Match) -> str:
+        cell_range = match.group("range")
+        if cell_range is None:
+            return shift_cell(match.group("cell"))
+
+        first_ref, last_ref = cell_range.split(":")
+        first_match = cell_pattern.fullmatch(first_ref)
+        last_match = cell_pattern.fullmatch(last_ref)
+        first_row = int(first_match.group(2))
+        last_row = int(last_match.group(2))
+
+        if first_row < delete_start <= last_row <= delete_end:
+            last_row = delete_start - 1
+            last_ref = f"{last_match.group(1)}{last_row}"
+        elif delete_start <= first_row <= delete_end < last_row:
+            first_ref = f"{first_match.group(1)}{delete_start}"
+            last_ref = f"{last_match.group(1)}{last_row - deleted_count}"
+        elif delete_start <= first_row <= last_row <= delete_end:
+            return "#REF!"
+        else:
+            first_ref = shift_cell(first_ref)
+            last_ref = shift_cell(last_ref)
+        return f"{first_ref}:{last_ref}"
+
+    return reference_pattern.sub(replace_reference, formula)
+
+
+def _delete_unused_item_rows(worksheet, item_count: int) -> None:
+    deleted_count = MAX_BLIND_ITEMS - item_count
+    if deleted_count <= 0:
+        return
+
+    delete_start = ITEM_START_ROW + item_count
+    delete_end = ITEM_START_ROW + MAX_BLIND_ITEMS - 1
+    for row in worksheet.iter_rows():
+        for cell in row:
+            if cell.data_type == "f" and isinstance(cell.value, str):
+                cell.value = _shift_formula_rows(
+                    cell.value, delete_start, delete_end, deleted_count
+                )
+
+    merges_to_move = []
+    for merged_range in list(worksheet.merged_cells.ranges):
+        min_col, min_row, max_col, max_row = range_boundaries(str(merged_range))
+        if min_row <= delete_end and max_row >= delete_start:
+            raise ValueError("Řádky položek zasahují do sloučených buněk šablony.")
+        if min_row > delete_end:
+            merges_to_move.append((min_col, min_row, max_col, max_row))
+            worksheet.unmerge_cells(str(merged_range))
+
+    row_dimensions = {
+        index: copy(dimension)
+        for index, dimension in worksheet.row_dimensions.items()
+    }
+    print_area = worksheet.print_area
+    worksheet.delete_rows(delete_start, deleted_count)
+
+    for index in list(worksheet.row_dimensions):
+        del worksheet.row_dimensions[index]
+    for index, dimension in row_dimensions.items():
+        if delete_start <= index <= delete_end:
+            continue
+        new_index = index - deleted_count if index > delete_end else index
+        dimension.index = new_index
+        worksheet.row_dimensions[new_index] = dimension
+
+    for min_col, min_row, max_col, max_row in merges_to_move:
+        worksheet.merge_cells(
+            start_row=min_row - deleted_count,
+            start_column=min_col,
+            end_row=max_row - deleted_count,
+            end_column=max_col,
+        )
+
+    if print_area:
+        area_reference = str(print_area).rsplit("!", 1)[-1]
+        min_col, min_row, max_col, max_row = range_boundaries(area_reference)
+        if min_row > delete_end:
+            min_row -= deleted_count
+        if max_row > delete_end:
+            max_row -= deleted_count
+        worksheet.print_area = (
+            f"'{worksheet.title}'!${get_column_letter(min_col)}${min_row}:"
+            f"${get_column_letter(max_col)}${max_row}"
+        )
 
 
 TEMPLATE_FILE = "data/cenik_vzor_zetta90.xlsx"
@@ -114,6 +224,7 @@ def create_pricelist(
             worksheet[f"F{row}"] = float(item["height_cm"])
             worksheet[f"G{row}"] = item["count"]
             worksheet[f"I{row}"] = item["price"]
+        _delete_unused_item_rows(worksheet, len(items))
         workbook.calculation.fullCalcOnLoad = True
         workbook.calculation.forceFullCalc = True
         workbook.calculation.calcMode = "auto"
