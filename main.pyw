@@ -201,8 +201,12 @@ class ShadeInstallApp(ctk.CTk):
             text_color="#1e293b",
         ).grid(row=0, column=0, padx=25, pady=15, sticky="w")
 
-        content = ctk.CTkFrame(
-            self.main_container, fg_color="#ffffff", corner_radius=12
+        content = ctk.CTkScrollableFrame(
+            self.main_container,
+            fg_color="#ffffff",
+            corner_radius=12,
+            scrollbar_button_color="#cbd5e1",
+            scrollbar_button_hover_color="#94a3b8",
         )
         content.grid(row=1, column=0, padx=25, pady=25, sticky="nsew")
 
@@ -352,6 +356,16 @@ class ShadeInstallApp(ctk.CTk):
         messagebox.showinfo(
             "Ceník vytvořen", f"Nový ceník:\n{output_path}", parent=self
         )
+        for entry in (
+            self.entry_customer_name,
+            self.entry_width,
+            self.entry_height,
+            self.entry_count,
+            self.entry_quote_number,
+        ):
+            entry.delete(0, "end")
+        self.price_result.configure(text="")
+        self.blind_type.set(BLIND_TYPES[0])
 
 
 def main() -> None:
