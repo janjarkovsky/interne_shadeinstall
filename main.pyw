@@ -498,13 +498,13 @@ class ShadeInstallApp(ctk.CTk):
             text=str(item_number),
             font=("Segoe UI", 13),
             text_color="#475569",
-        ).grid(row=0, column=0, padx=5, sticky="w")
+        ).grid(row=0, column=0, padx=5, sticky="nw")
         width_field = ctk.CTkFrame(row_frame, fg_color="transparent")
-        width_field.grid(row=0, column=1, padx=5, sticky="w")
+        width_field.grid(row=0, column=1, padx=5, sticky="nw")
         width_entry = self._create_item_entry(width_field, 170)
         width_entry.grid(row=0, column=0, padx=(0, 8), sticky="w")
         warning_frame = ctk.CTkFrame(width_field, fg_color="transparent")
-        warning_frame.grid(row=0, column=1, sticky="w")
+        warning_frame.grid(row=1, column=0, pady=(2, 0), sticky="w")
         ctk.CTkLabel(
             warning_frame,
             text="!",
@@ -526,9 +526,9 @@ class ShadeInstallApp(ctk.CTk):
         width_entry.bind("<KeyRelease>", update_warning, add="+")
         width_entry.bind("<FocusOut>", update_warning, add="+")
         height_entry = self._create_item_entry(row_frame, 170)
-        height_entry.grid(row=0, column=2, padx=5, sticky="w")
+        height_entry.grid(row=0, column=2, padx=5, sticky="nw")
         count_entry = self._create_item_entry(row_frame, 130)
-        count_entry.grid(row=0, column=3, padx=5, sticky="w")
+        count_entry.grid(row=0, column=3, padx=5, sticky="nw")
         self._bind_enter(width_entry, height_entry)
         self._bind_enter(height_entry, count_entry)
         count_entry.bind(
